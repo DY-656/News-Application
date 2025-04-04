@@ -1,28 +1,70 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const newsData = [
-        {
-            title: "Scientists Discover New Species in Amazon Rainforest",
-            description: "A team of international scientists has discovered five new species of animals during an expedition to the Amazon rainforest.",
-            image: "https://via.placeholder.com/600x400?text=Amazon+Discovery",
-            source: "Science Daily",
-            date: "2025-04-01",
-            url: "#",
-            category: "science"
-        },
-        {
-            title: "Tech Giant Unveils Revolutionary AI Assistant",
-            description: "The latest AI assistant can understand and respond to complex human emotions, setting a new standard for human-computer interaction.",
-            image: "https://via.placeholder.com/600x400?text=AI+Assistant",
-            source: "Tech Insider",
-            date: "2025-04-01",
-            url: "#",
-            category: "technology"
+    // We'll store fetched news here
+    let newsData = [];
+    
+    // Fetch news from API when page loads
+    fetchNewsFromAPI('general');
+
+    function fetchNewsFromAPI(category = 'general') {
+        // Show loading state
+        const newsContainer = document.getElementById('news-container');
+        newsContainer.innerHTML = '<div class="loading">Loading news...</div>';
+        
+        // API URL with category parameter
+        const apiUrl = `https://newsapi.org/v2/top-headlines?category=${category}&apiKey=136cef8718984499a18771d56b327550`;
+        
+        fetch(apiUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.articles) {
+                    // Transform API data directly here
+                    newsData = data.articles.map(article => ({
+                        title: article.title || 'No title available',
+                        description: article.description || 'No description available',
+                        image: article.urlToImage || 'https://via.placeholder.com/600x400?text=No+Image',
+                        source: article.source?.name || 'Unknown Source',
+                        date: article.publishedAt || new Date().toISOString(),
+                        url: article.url || '#',
+                        category: category
+                    }));
+                    
+                    displayNews(newsData);
+                    updateActiveCategoryButton(category);
+                } else {
+                    newsContainer.innerHTML = '<div class="no-results">No news articles found</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching news:', error);
+                newsContainer.innerHTML = '<div class="error">Failed to load news. Please try again later.</div>';
+            });
+    }
+
+    function updateActiveCategoryButton(category) {
+        // Remove 'active' class from all category buttons
+        const categories = document.querySelectorAll('.category');
+        categories.forEach(cat => cat.classList.remove('active'));
+        
+        // Add 'active' class to the matching category button
+        const activeButton = document.querySelector(`.category[data-category="${category}"]`);
+        if (activeButton) {
+            activeButton.classList.add('active');
         }
-    ];
+    }
 
     function displayNews(articles) {
         const newsContainer = document.getElementById('news-container');
         newsContainer.innerHTML = '';
+
+        if (articles.length === 0) {
+            newsContainer.innerHTML = '<div class="no-results">No news articles found</div>';
+            return;
+        }
 
         articles.forEach(article => {
             const newsCard = document.createElement('div');
@@ -30,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             newsCard.innerHTML = `
                 <div class="news-image">
-                    <img src="${article.image}" alt="${article.title}">
+                    <img src="${article.image}" alt="${article.title}" onerror="this.src='https://via.placeholder.com/600x400?text=Image+Not+Available'">
                 </div>
                 <div class="news-content">
                     <div class="news-source">
@@ -39,7 +81,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     <h3 class="news-title">${article.title}</h3>
                     <p class="news-description">${article.description}</p>
-                    <a href="${article.url}" class="read-more">Read More</a>
+                    <a href="${article.url}" class="read-more" target="_blank">Read More</a>
                 </div>
             `;
 
@@ -49,23 +91,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function formatDate(dateStr) {
         const options = { year: 'numeric', month: 'long', day: 'numeric' };
-        return new Date(dateStr).toLocaleDateString('en-US', options);
+        try {
+            return new Date(dateStr).toLocaleDateString('en-US', options);
+        } catch (e) {
+            return 'Unknown Date';
+        }
     }
 
-    displayNews(newsData);
-
+    // Category filter functionality
     const categories = document.querySelectorAll('.category');
     categories.forEach(category => {
         category.addEventListener('click', function() {
-            categories.forEach(cat => cat.classList.remove('active'));
-            this.classList.add('active');
-
             const selectedCategory = this.dataset.category;
-            let filteredNews = selectedCategory === 'general' ? newsData : newsData.filter(article => article.category === selectedCategory);
-            displayNews(filteredNews);
+            fetchNewsFromAPI(selectedCategory);
         });
     });
 
+    // Search functionality
     const searchButton = document.getElementById('search-button');
     const searchInput = document.getElementById('search-input');
     
@@ -91,5 +133,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         displayNews(filteredNews);
     }
-});
 
+    // Add refresh button functionality
+    const refreshButton = document.getElementById('refresh-button');
+    if (refreshButton) {
+        refreshButton.addEventListener('click', () => fetchNewsFromAPI('general'));
+    }
+});
