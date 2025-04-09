@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // We'll store fetched news here
     let newsData = [];
+    let searchTimeout = null;
     
     // Fetch news from API when page loads
     fetchNewsFromAPI('general');
@@ -10,8 +11,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const newsContainer = document.getElementById('news-container');
         newsContainer.innerHTML = '<div class="loading">Loading news...</div>';
         
-        // API URL with category parameter
-        const apiUrl = `https://newsapi.org/v2/top-headlines?category=${category}&apiKey=136cef8718984499a18771d56b327550`;
+        // GNews API URL with category parameter
+        const apiUrl = `https://gnews.io/api/v4/top-headlines?category=${encodeURIComponent(category)}&apikey=58ef7f580b9503e995f5247a3dfa6f3b&lang=en`;
         
         fetch(apiUrl)
             .then(response => {
@@ -21,12 +22,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 return response.json();
             })
             .then(data => {
-                if (data.articles) {
-                    // Transform API data directly here
+                if (data.articles && Array.isArray(data.articles)) {
+                    // Transform GNews API data to our format
                     newsData = data.articles.map(article => ({
                         title: article.title || 'No title available',
                         description: article.description || 'No description available',
-                        image: article.urlToImage || 'https://via.placeholder.com/600x400?text=No+Image',
+                        image: article.image || 'https://via.placeholder.com/600x400?text=No+Image',
                         source: article.source?.name || 'Unknown Source',
                         date: article.publishedAt || new Date().toISOString(),
                         url: article.url || '#',
@@ -57,11 +58,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function escapeHTML(str) {
+        if (!str || typeof str !== 'string') return '';
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
     function displayNews(articles) {
         const newsContainer = document.getElementById('news-container');
         newsContainer.innerHTML = '';
 
-        if (articles.length === 0) {
+        if (!articles || articles.length === 0) {
             newsContainer.innerHTML = '<div class="no-results">No news articles found</div>';
             return;
         }
@@ -70,18 +81,24 @@ document.addEventListener('DOMContentLoaded', function() {
             const newsCard = document.createElement('div');
             newsCard.className = 'news-card';
 
+            const safeTitle = escapeHTML(article.title);
+            const safeDesc = escapeHTML(article.description);
+            const safeSource = escapeHTML(article.source);
+            const safeUrl = article.url && article.url.startsWith('http') ? article.url : '#';
+            const safeImage = article.image && article.image.startsWith('http') ? article.image : 'https://via.placeholder.com/600x400?text=No+Image';
+
             newsCard.innerHTML = `
                 <div class="news-image">
-                    <img src="${article.image}" alt="${article.title}" onerror="this.src='https://via.placeholder.com/600x400?text=Image+Not+Available'">
+                    <img src="${safeImage}" alt="${safeTitle}" onerror="this.src='https://via.placeholder.com/600x400?text=Image+Not+Available'">
                 </div>
                 <div class="news-content">
                     <div class="news-source">
-                        <span class="source-name">${article.source}</span>
+                        <span class="source-name">${safeSource}</span>
                         <span class="news-date">${formatDate(article.date)}</span>
                     </div>
-                    <h3 class="news-title">${article.title}</h3>
-                    <p class="news-description">${article.description}</p>
-                    <a href="${article.url}" class="read-more" target="_blank">Read More</a>
+                    <h3 class="news-title">${safeTitle}</h3>
+                    <p class="news-description">${safeDesc}</p>
+                    <a href="${safeUrl}" class="read-more" target="_blank" rel="noopener noreferrer">Read More</a>
                 </div>
             `;
 
@@ -103,7 +120,9 @@ document.addEventListener('DOMContentLoaded', function() {
     categories.forEach(category => {
         category.addEventListener('click', function() {
             const selectedCategory = this.dataset.category;
-            fetchNewsFromAPI(selectedCategory);
+            if (selectedCategory) {
+                fetchNewsFromAPI(selectedCategory);
+            }
         });
     });
 
@@ -117,6 +136,12 @@ document.addEventListener('DOMContentLoaded', function() {
             performSearch();
         }
     });
+    
+    // Add debounce to search input
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(performSearch, 300);
+    });
 
     function performSearch() {
         const searchTerm = searchInput.value.toLowerCase().trim();
@@ -126,9 +151,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const filteredNews = newsData.filter(article => {
-            return article.title.toLowerCase().includes(searchTerm) || 
-                   article.description.toLowerCase().includes(searchTerm) ||
-                   article.source.toLowerCase().includes(searchTerm);
+            const title = article.title?.toLowerCase() || '';
+            const description = article.description?.toLowerCase() || '';
+            const source = article.source?.toLowerCase() || '';
+            
+            return title.includes(searchTerm) || 
+                   description.includes(searchTerm) ||
+                   source.includes(searchTerm);
         });
 
         displayNews(filteredNews);
