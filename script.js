@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
         newsContainer.innerHTML = '<div class="loading">Loading news...</div>';
         
         // GNews API URL with category parameter
-        const apiUrl = `https://gnews.io/api/v4/top-headlines?category=${encodeURIComponent(category)}&apikey=58ef7f580b9503e995f5247a3dfa6f3b&lang=en`;
+        const apiUrl = `https://gnews.io/api/v4/top-headlines?category=${encodeURIComponent(category)}&apikey=YOUR_API_KEY&lang=en`;
         
         fetch(apiUrl)
             .then(response => {
