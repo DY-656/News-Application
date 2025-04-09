@@ -1,1 +1,1 @@
-# News-Application Javascript done
+# News-Application
